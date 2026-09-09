@@ -26,6 +26,8 @@ dependencies = [
     "questionary>=2.0.0",
     "bs4>=0.0.2",
     "ebooklib>=0.20",
+    "chromadb>=1.5.9",
+    "langchain-chroma>=1.1.0",
 ]
 
 [project.scripts]
