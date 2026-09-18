@@ -8,10 +8,13 @@ import { useChatStore } from '@/store/useChatStore';
  *
  * Character replies are intentionally NOT shown here — they appear exclusively
  * as 3D speech bubbles above the characters' heads in the scene.
- * The store no longer stores character messages, so this list is purely user messages.
+ * The store contains both user and character messages, but this list filters
+ * to show only user messages.
  */
 export default function ChatMessageList() {
-  const messages = useChatStore((s) => s.messages);
+  const messages = useChatStore((s) =>
+    s.questionGroups.flatMap((g) => g.responses).filter((m) => m.senderId === 'user')
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +32,7 @@ export default function ChatMessageList() {
     >
       {messages.map((msg) => (
         <div key={msg.id} className="flex justify-end">
-          <div className="max-w-[80%] rounded-xl rounded-br-sm px-3 py-1.5 text-sm leading-snug bg-msn-teal/80 text-white">
+          <div className="max-w-[80%] rounded-[4px_6px_5px_4px] px-3.5 py-1.5 text-sm leading-snug parchment-surface border border-[#8C6D46]/40 text-[#2B1B0E] font-parchment shadow-sm">
             {msg.text}
           </div>
         </div>

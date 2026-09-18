@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { CharacterConfig } from '@/types';
+import { useChatStore } from '@/store/useChatStore';
 import {
   CHARACTER_TARGET_HEIGHT,
   CHARACTER_HEAD_Y_FRACTION,
@@ -42,10 +43,18 @@ interface CharacterProps {
  */
 function CharacterBody({
   color,
+  accentColor,
   speakingMessage,
+  isThinking,
+  portraitSrc,
+  portraitCrop,
 }: {
   color: string;
+  accentColor?: string;
   speakingMessage?: string;
+  isThinking?: boolean;
+  portraitSrc: string;
+  portraitCrop: CharacterConfig['portraitCrop'];
 }) {
   const { scene } = useGLTF('/models/scene.gltf');
 
@@ -65,6 +74,17 @@ function CharacterBody({
     [color],
   );
 
+  // Subtle warm body emissive boost during speech
+  useEffect(() => {
+    if (speakingMessage) {
+      mat.emissive.set('#8f4e1f');
+      mat.emissiveIntensity = 0.28;
+    } else {
+      mat.emissive.set('#000000');
+      mat.emissiveIntensity = 0.0;
+    }
+  }, [speakingMessage, mat]);
+
   // Apply the colored material to every mesh in the clone
   useMemo(() => {
     cloned.traverse((child) => {
@@ -83,13 +103,6 @@ function CharacterBody({
    *   - a uniform scale that normalizes height to CHARACTER_TARGET_HEIGHT
    *   - a position that both (a) lifts the model so its feet sit on Y=0, and
    *     (b) RE-CENTRES it horizontally (X/Z) on the group's local origin.
-   *
-   * (b) is critical: the raw GLTF mesh is NOT centred on its own local origin.
-   * Without re-centring, rotating the character group to face the table
-   * (different rotation per seat) swings the off-centre mesh to a different
-   * world position for every seat angle — which is what previously made the
-   * three characters look wildly different in size/position (an artifact of
-   * perspective distance, not actual geometry differences).
    */
   const layout = useMemo(() => {
     const box = new THREE.Box3().setFromObject(cloned);
@@ -107,29 +120,11 @@ function CharacterBody({
       -center.z * scale, // re-centre Z on local origin
     ];
 
-    // headY/headRadius are pure functions of the shared target constants, so
-    // they are — by construction — identical across every character instance.
     const headY = modelPosition[1] + CHARACTER_TARGET_HEIGHT * CHARACTER_HEAD_Y_FRACTION;
     const headRadius = CHARACTER_TARGET_HEIGHT * CHARACTER_HEAD_RADIUS_FRACTION;
 
     return { scale, modelPosition, headY, headRadius, rawSize: size.clone() };
   }, [cloned]);
-
-  // Dev-only verification: confirms all three characters measure identically.
-  // Open the browser console and compare the `scale` value across the three
-  // "aria" / "rex" / "sol" log lines — they must match (within rounding error).
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;
-    // eslint-disable-next-line no-console
-    console.log('[Character bbox check]', {
-      color,
-      rawSize: layout.rawSize.toArray().map((n) => Number(n.toFixed(4))),
-      scale: Number(layout.scale.toFixed(4)),
-      modelPosition: layout.modelPosition.map((n) => Number(n.toFixed(4))),
-      headY: Number(layout.headY.toFixed(4)),
-      headRadius: Number(layout.headRadius.toFixed(4)),
-    });
-  }, [color, layout]);
 
   const bubbleY = layout.headY + layout.headRadius + 0.32;
 
@@ -144,10 +139,19 @@ function CharacterBody({
        * copied world-space coordinate.
        */}
       <group position={[0, layout.headY, 0]}>
-        <CharacterFace headRadius={layout.headRadius} />
+        <CharacterFace
+          headRadius={layout.headRadius}
+          portraitSrc={portraitSrc}
+          portraitCrop={portraitCrop}
+        />
       </group>
 
-      {speakingMessage && <SpeechBubble message={speakingMessage} yOffset={bubbleY} />}
+      <SpeechBubble
+        message={speakingMessage}
+        isThinking={isThinking}
+        yOffset={bubbleY}
+        accentColor={accentColor}
+      />
     </>
   );
 }
@@ -168,28 +172,89 @@ function BuddyFallback({ color }: { color: string }) {
 /**
  * The one and only Character component in the codebase.
  * Takes a CharacterConfig (color + seat angle) and renders the buddy model,
- * face plane, and speech bubble as one unit, seated at the config's seat angle.
- *
- * No size/scale prop exists here or anywhere downstream — CharacterBody derives
- * identical sizing for every instance from a shared runtime measurement.
+ * face plane, ground speaker halo, and speech bubble as one unit, seated at the config's seat angle.
  */
 export default function Character({ config, speakingMessage }: CharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const isThinking = useChatStore((s) => s.thinkingCharacterIds.includes(config.id));
+
   const swayPhase = useRef(Math.random() * Math.PI * 2);
+  const targetRotationY = useRef(0);
+  const currentRotationY = useRef(0);
 
   const [px, , pz] = seatPosition(config.seatAngleDeg);
   const facingRad = seatFacingAngle(config.seatAngleDeg);
 
+  // Calculate target rotation when speaking (turn toward user at 0°)
+  useEffect(() => {
+    if (speakingMessage) {
+      let turnAmount = 0;
+      if (config.seatAngleDeg === 180) {
+        turnAmount = 0.1;
+      } else if (config.seatAngleDeg === 90) {
+        turnAmount = 0.69;
+      } else if (config.seatAngleDeg === 270) {
+        turnAmount = -0.69;
+      }
+      targetRotationY.current = turnAmount;
+    } else {
+      targetRotationY.current = 0;
+    }
+  }, [speakingMessage, config.seatAngleDeg]);
+
   useFrame((_, delta) => {
     if (!groupRef.current) return;
-    swayPhase.current += delta * 0.65;
-    groupRef.current.rotation.z = Math.sin(swayPhase.current) * 0.016;
+
+    // Gentle sway animation (subtle breathing/alive motion)
+    swayPhase.current += delta * 0.8;
+    const swayAmount = Math.sin(swayPhase.current) * 0.02;
+    groupRef.current.rotation.z = swayAmount;
+
+    // Smoothly interpolate Y rotation toward target (turn toward user when speaking)
+    const lerpSpeed = 3.0;
+    currentRotationY.current += (targetRotationY.current - currentRotationY.current) * lerpSpeed * delta;
+    groupRef.current.rotation.y = facingRad + currentRotationY.current;
+
+    // Smoothly lerp speaking halo opacity at the character's feet
+    if (haloMatRef.current) {
+      const targetOpacity = speakingMessage ? 0.62 : 0.0;
+      haloMatRef.current.opacity += (targetOpacity - haloMatRef.current.opacity) * 6.0 * delta;
+    }
   });
 
   return (
-    <group ref={groupRef} position={[px, CHAIR_SEAT_HEIGHT, pz]} rotation={[0, facingRad, 0]}>
+    <group ref={groupRef} position={[px, CHAIR_SEAT_HEIGHT, pz]}>
+      {/* 3D Active speaker halo ring at chair base / rug level */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -CHAIR_SEAT_HEIGHT + 0.006, 0]}>
+        <ringGeometry args={[0.42, 0.7, 36]} />
+        <meshBasicMaterial
+          ref={haloMatRef}
+          color="#f2be6b"
+          transparent
+          opacity={0}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
       <Suspense fallback={<BuddyFallback color={config.color} />}>
-        <CharacterBody color={config.color} speakingMessage={speakingMessage} />
+        <CharacterBody
+          color={config.color}
+          accentColor={
+            config.id === 'marx'
+              ? '#8B1E2B'
+              : config.id === 'bakunin'
+              ? '#38302B'
+              : config.id === 'mill'
+              ? '#A0751A'
+              : '#8C6D46'
+          }
+          speakingMessage={speakingMessage}
+          isThinking={isThinking}
+          portraitSrc={config.portraitSrc}
+          portraitCrop={config.portraitCrop}
+        />
       </Suspense>
     </group>
   );

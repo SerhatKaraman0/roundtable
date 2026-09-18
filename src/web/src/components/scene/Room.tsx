@@ -20,11 +20,13 @@ export default function Room() {
   // ── Color palette ────────────────────────────────────────────────────────
   const upperWallColor  = '#e8dfd0';  // warm off-white
   const wainscotColor   = '#c9b99a';  // darker warm tan panel
-  const floorColor      = '#8b6914';  // warm parquet wood
-  const floorDarkColor  = '#6b4e10';  // alternate parquet strip
+  const floorColor      = '#54381e';  // rich warm walnut parquet
+  const floorDarkColor  = '#3d2612';  // deep espresso parquet strip
   const ceilingColor    = '#f0e8d8';  // slightly warm white
   const moldingColor    = '#d4c4aa';  // cornice / baseboard
-  const rugColor        = '#7c3030';  // deep red rug
+  const rugBurgundy     = '#501A1E';  // deep historical burgundy rug
+  const rugInner        = '#3B1215';  // rich inner medallion tone
+  const rugGoldBorder   = '#8C6D46';  // aged brass / antique gold border
 
   const wainscotH = 0.9;   // height of the lower wall panel
   const wainscotY = wainscotH / 2;
@@ -41,7 +43,7 @@ export default function Room() {
       {/* Base warm wood */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[ROOM_WIDTH, ROOM_DEPTH]} />
-        <meshStandardMaterial color={floorColor} roughness={0.75} metalness={0.05} />
+        <meshStandardMaterial color={floorColor} roughness={0.72} metalness={0.04} />
       </mesh>
       {/* Parquet plank stripes — alternating darker strips along Z */}
       {Array.from({ length: 7 }, (_, i) => i - 3).map((i) => (
@@ -52,19 +54,30 @@ export default function Room() {
           receiveShadow
         >
           <planeGeometry args={[0.38, ROOM_DEPTH]} />
-          <meshStandardMaterial color={floorDarkColor} roughness={0.78} metalness={0.04} />
+          <meshStandardMaterial color={floorDarkColor} roughness={0.75} metalness={0.04} />
         </mesh>
       ))}
 
-      {/* ════ CIRCULAR RUG under the table ════ */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <circleGeometry args={[TABLE_RADIUS + 1.1, 32]} />
-        <meshStandardMaterial color={rugColor} roughness={0.95} />
-      </mesh>
-      {/* Rug border ring */}
+      {/* ════ CONCENTRIC LIBRARY RUG under the table ════ */}
+      {/* Outer base rug */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
-        <ringGeometry args={[TABLE_RADIUS + 0.95, TABLE_RADIUS + 1.1, 32]} />
-        <meshStandardMaterial color="#5a1f1f" roughness={0.95} />
+        <circleGeometry args={[TABLE_RADIUS + 1.25, 48]} />
+        <meshStandardMaterial color={rugBurgundy} roughness={0.96} />
+      </mesh>
+      {/* Outer gold decorative border */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <ringGeometry args={[TABLE_RADIUS + 1.15, TABLE_RADIUS + 1.25, 48]} />
+        <meshStandardMaterial color={rugGoldBorder} roughness={0.85} metalness={0.1} />
+      </mesh>
+      {/* Inner concentric disc */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0]}>
+        <circleGeometry args={[TABLE_RADIUS + 0.95, 48]} />
+        <meshStandardMaterial color={rugInner} roughness={0.96} />
+      </mesh>
+      {/* Inner gold medallion ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <ringGeometry args={[TABLE_RADIUS + 0.9, TABLE_RADIUS + 0.95, 48]} />
+        <meshStandardMaterial color={rugGoldBorder} roughness={0.85} metalness={0.1} />
       </mesh>
 
       {/* ════ CEILING ════ */}
@@ -197,6 +210,10 @@ export default function Room() {
             <meshStandardMaterial color="#b8a898" roughness={0.95} />
           </mesh>
         </group>
+
+        {/* Library Bookshelves on west wall */}
+        <Bookshelf position={[-2.6, 0, 0.18]} />
+        <Bookshelf position={[2.6, 0, 0.18]} />
       </group>
 
       {/* ── East wall (right from user's view) ── */}
@@ -229,6 +246,10 @@ export default function Room() {
             <meshStandardMaterial color="#c8b8a8" roughness={0.95} />
           </mesh>
         </group>
+
+        {/* Library Bookshelves on east wall */}
+        <Bookshelf position={[-2.6, 0, 0.18]} />
+        <Bookshelf position={[2.6, 0, 0.18]} />
       </group>
 
       {/* ════ PENDANT LIGHT FIXTURE (visual only — actual light is in Lighting.tsx) ════ */}
@@ -313,3 +334,76 @@ export default function Room() {
     </group>
   );
 }
+
+/**
+ * Procedural low-poly Bookshelf with dark walnut casing and rows of antique books.
+ */
+function Bookshelf({ position = [0, 0, 0] }: { position?: [number, number, number] }) {
+  const shelfH = 2.4;
+  const shelfW = 1.8;
+  const shelfD = 0.36;
+  const woodColor = '#3a2213';
+  const backColor = '#24150b';
+
+  // Historical book spine colors
+  const bookColors = ['#5a2121', '#1e382b', '#253549', '#634b28', '#422817', '#36223b', '#6b2d24'];
+
+  return (
+    <group position={position}>
+      {/* Outer frame: Backboard */}
+      <mesh position={[0, shelfH / 2, -shelfD / 2 + 0.015]}>
+        <boxGeometry args={[shelfW, shelfH, 0.03]} />
+        <meshStandardMaterial color={backColor} roughness={0.8} />
+      </mesh>
+      {/* Left side panel */}
+      <mesh position={[-shelfW / 2 + 0.02, shelfH / 2, 0]}>
+        <boxGeometry args={[0.04, shelfH, shelfD]} />
+        <meshStandardMaterial color={woodColor} roughness={0.65} />
+      </mesh>
+      {/* Right side panel */}
+      <mesh position={[shelfW / 2 - 0.02, shelfH / 2, 0]}>
+        <boxGeometry args={[0.04, shelfH, shelfD]} />
+        <meshStandardMaterial color={woodColor} roughness={0.65} />
+      </mesh>
+      {/* Top crown cornice */}
+      <mesh position={[0, shelfH - 0.02, 0]}>
+        <boxGeometry args={[shelfW + 0.06, 0.06, shelfD + 0.04]} />
+        <meshStandardMaterial color={woodColor} roughness={0.6} />
+      </mesh>
+      {/* Bottom plinth */}
+      <mesh position={[0, 0.04, 0]}>
+        <boxGeometry args={[shelfW + 0.04, 0.08, shelfD + 0.02]} />
+        <meshStandardMaterial color={woodColor} roughness={0.6} />
+      </mesh>
+
+      {/* Horizontal shelves & book rows */}
+      {[0.5, 1.0, 1.5, 2.0].map((y, sIdx) => (
+        <group key={`shelf-${sIdx}`}>
+          {/* Shelf plank */}
+          <mesh position={[0, y, 0]}>
+            <boxGeometry args={[shelfW - 0.04, 0.03, shelfD - 0.02]} />
+            <meshStandardMaterial color={woodColor} roughness={0.7} />
+          </mesh>
+          {/* Row of books on shelf (below top crown) */}
+          {y < 2.0 && (
+            <group position={[-shelfW / 2 + 0.14, y + 0.015, 0]}>
+              {Array.from({ length: 14 }).map((_, bIdx) => {
+                const bWidth = 0.06 + (bIdx % 3) * 0.02;
+                const bHeight = 0.32 - (bIdx % 4) * 0.03;
+                const color = bookColors[(bIdx + sIdx * 3) % bookColors.length];
+                const xOffset = bIdx * 0.11;
+                return (
+                  <mesh key={`b-${sIdx}-${bIdx}`} position={[xOffset, bHeight / 2, 0]}>
+                    <boxGeometry args={[bWidth, bHeight, shelfD * 0.65]} />
+                    <meshStandardMaterial color={color} roughness={0.75} />
+                  </mesh>
+                );
+              })}
+            </group>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+

@@ -7,9 +7,9 @@ import { SEAT_ANGLES_DEG, seatPosition, seatFacingAngle } from './constants';
  *
  * Layout (bird's-eye view, angle from +Z axis):
  *
- *          180° — Aria (Communist, red)
+ *          180° — Marx (Communist, red)
  *                   │
- *   90° Rex ────── [table] ────── 270° Sol
+ *   90° Bakunin ──── [table] ────── 270° Mill
  *   (Anarchist)                  (Libertarian)
  *                   │
  *                 0° — User
@@ -18,31 +18,37 @@ import { SEAT_ANGLES_DEG, seatPosition, seatFacingAngle } from './constants';
  */
 export const CHARACTERS: CharacterConfig[] = [
   {
-    id: 'aria',
-    name: 'Aria',
+    id: 'marx',
+    name: 'Marx',
     ideology: 'communist',
     seatAngleDeg: SEAT_ANGLES_DEG.front,   // 180° — directly opposite user
-    color: '#B0102A',                        // darker, saturated communist red
-    accentColor: '#FFD700',                  // gold accent for optional star detail
+    color: '#8B1E2B',                        // muted antique seal red (~20% desaturated)
+    accentColor: '#B8860B',                  // antique gold accent
     personality: 'idealistic and resolute',
+    portraitSrc: '/imgs/Karl_Marx.jpeg',
+    portraitCrop: { cx: 0.57, cy: 0.36, width: 0.50 },
   },
   {
-    id: 'rex',
-    name: 'Rex',
+    id: 'bakunin',
+    name: 'Bakunin',
     ideology: 'anarchist',
     seatAngleDeg: SEAT_ANGLES_DEG.left,    // 90° — user's left
-    color: '#1a1a1a',                        // near-black (anarchist black flag)
-    accentColor: '#C8102E',                  // red accent (black-red anarchist flag)
+    color: '#2E2724',                        // antique lamp-black charcoal
+    accentColor: '#8B1E2B',                  // antique red accent
     personality: 'provocative and free-spirited',
+    portraitSrc: '/imgs/Mikhail_Bakunin.jpg',
+    portraitCrop: { cx: 0.54, cy: 0.35, width: 0.48 },
   },
   {
-    id: 'sol',
-    name: 'Sol',
+    id: 'mill',
+    name: 'Mill',
     ideology: 'libertarian',
     seatAngleDeg: SEAT_ANGLES_DEG.right,   // 270° — user's right
-    color: '#D4A017',                        // deeper, saturated libertarian gold
-    accentColor: '#c9920a',                  // deeper gold accent
+    color: '#A0751A',                        // muted antique ochre gold (~20% desaturated)
+    accentColor: '#7A5B18',                  // deeper antique gold accent
     personality: 'individualist and pragmatic',
+    portraitSrc: '/imgs/John_Stuart_Mill.jpg',
+    portraitCrop: { cx: 0.50, cy: 0.32, width: 0.72 },
   },
 ];
 

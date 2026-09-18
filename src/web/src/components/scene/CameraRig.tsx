@@ -5,6 +5,7 @@ import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useChatStore } from '@/store/useChatStore';
 import { CAMERA_Y, CAMERA_Z } from '@/lib/constants';
+import { startAmbience } from '@/lib/ambientAudio';
 
 const PITCH_LIMIT = (80 * Math.PI) / 180; // ±80° vertical clamp
 
@@ -55,6 +56,7 @@ export default function CameraRig() {
     const canvas = gl.domElement;
 
     const onClick = () => {
+      startAmbience().catch(() => {});
       if (!isChatFocused && document.pointerLockElement !== canvas) {
         canvas.requestPointerLock();
       }

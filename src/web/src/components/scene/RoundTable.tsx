@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   TABLE_RADIUS,
@@ -19,12 +20,10 @@ import { CHARACTERS } from '@/lib/characters';
 function useTableMat() {
   return useMemo(
     () =>
-      new THREE.MeshPhysicalMaterial({
-        color: '#2a1f14',
-        roughness: 0.25,
+      new THREE.MeshStandardMaterial({
+        color: '#52341d', // rich warm walnut brown
+        roughness: 0.58,
         metalness: 0.04,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.08,
       }),
     [],
   );
@@ -287,7 +286,7 @@ export default function RoundTable() {
         <cylinderGeometry
           args={[TABLE_PEDESTAL_RADIUS, TABLE_PEDESTAL_RADIUS * 1.2, pedestalHeight, 16]}
         />
-        <meshStandardMaterial color="#1a1510" roughness={0.7} />
+        <meshStandardMaterial color="#2c1a0e" roughness={0.7} />
       </mesh>
 
       {/* ── Base ── */}
@@ -295,7 +294,7 @@ export default function RoundTable() {
         <cylinderGeometry
           args={[TABLE_PEDESTAL_RADIUS * 2.6, TABLE_PEDESTAL_RADIUS * 2.6, 0.08, 24]}
         />
-        <meshStandardMaterial color="#1a1510" roughness={0.6} />
+        <meshStandardMaterial color="#2c1a0e" roughness={0.6} />
       </mesh>
 
       {/* ── Place settings ── */}
@@ -311,7 +310,7 @@ export default function RoundTable() {
       ))}
 
       {/* ── Wine bottle on the table ── */}
-      <group position={[0.3, surfaceY + 0.12, 0.2]} rotation={[0, 0.4, 0]}>
+      <group position={[0.32, surfaceY + 0.12, 0.22]} rotation={[0, 0.4, 0]}>
         {/* Bottle body */}
         <mesh castShadow>
           <cylinderGeometry args={[0.04, 0.045, 0.28, 16]} />
@@ -339,62 +338,73 @@ export default function RoundTable() {
         </mesh>
       </group>
 
-      {/* ── Salad bowl in the center ── */}
-      <group position={[0, surfaceY + 0.08, 0]}>
-        {/* Bowl */}
-        <mesh castShadow receiveShadow>
-          <cylinderGeometry args={[0.25, 0.22, 0.12, 24]} />
-          <meshStandardMaterial color="#8b7355" roughness={0.6} />
-        </mesh>
-        {/* Bowl interior (darker) */}
-        <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.23, 0.20, 0.08, 24]} />
-          <meshStandardMaterial color="#6b5344" roughness={0.7} />
-        </mesh>
-        {/* Salad leaves */}
-        <group position={[0, 0.09, 0]}>
-          {Array.from({ length: 12 }, (_, i) => {
-            const angle = (i / 12) * Math.PI * 2;
-            const radius = 0.05 + Math.random() * 0.15;
-            return (
-              <mesh
-                key={i}
-                position={[
-                  Math.cos(angle) * radius,
-                  0.01 + Math.random() * 0.02,
-                  Math.sin(angle) * radius,
-                ]}
-                rotation={[Math.random() * 0.3, Math.random() * Math.PI, Math.random() * 0.3]}
-                castShadow
-              >
-                <sphereGeometry args={[0.03 + Math.random() * 0.02, 8, 8]} />
-                <meshStandardMaterial
-                  color={Math.random() > 0.3 ? '#4a7c23' : '#5a8c33'}
-                  roughness={0.8}
-                />
-              </mesh>
-            );
-          })}
-        </group>
-        {/* Cherry tomatoes */}
-        {Array.from({ length: 4 }, (_, i) => {
-          const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-          return (
-            <mesh
-              key={`tomato-${i}`}
-              position={[
-                Math.cos(angle) * 0.1,
-                0.12,
-                Math.sin(angle) * 0.1,
-              ]}
-              castShadow
-            >
-              <sphereGeometry args={[0.02, 8, 8]} />
-              <meshStandardMaterial color="#cc3333" roughness={0.6} />
-            </mesh>
-          );
-        })}
-      </group>
+      {/* ── Antique Candle Centerpiece with gentle flame flicker ── */}
+      <CandleCenterpiece surfaceY={surfaceY} />
     </group>
   );
 }
+
+/**
+ * Antique brass candlestick with animated flame flicker.
+ */
+function CandleCenterpiece({ surfaceY }: { surfaceY: number }) {
+  const lightRef = useRef<THREE.PointLight>(null);
+  const flameRef = useRef<THREE.Mesh>(null);
+  const time = useRef(0);
+
+  useFrame((_, delta) => {
+    time.current += delta;
+    if (lightRef.current) {
+      // Gentle natural candlelight flicker
+      const flicker =
+        Math.sin(time.current * 7.2) * 0.15 +
+        Math.sin(time.current * 13.8) * 0.1 +
+        (Math.random() - 0.5) * 0.08;
+      lightRef.current.intensity = 1.7 + flicker;
+    }
+    if (flameRef.current) {
+      const scaleY = 1 + Math.sin(time.current * 8.5) * 0.09;
+      flameRef.current.scale.set(1, scaleY, 1);
+    }
+  });
+
+  return (
+    <group position={[0, surfaceY, 0]}>
+      {/* Brass base */}
+      <mesh position={[0, 0.012, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.085, 0.11, 0.024, 16]} />
+        <meshStandardMaterial color="#8a6c38" roughness={0.35} metalness={0.7} />
+      </mesh>
+      {/* Brass stem */}
+      <mesh position={[0, 0.055, 0]} castShadow>
+        <cylinderGeometry args={[0.024, 0.036, 0.07, 12]} />
+        <meshStandardMaterial color="#8a6c38" roughness={0.35} metalness={0.7} />
+      </mesh>
+      {/* Candle wax stick */}
+      <mesh position={[0, 0.145, 0]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 0.12, 12]} />
+        <meshStandardMaterial color="#f2e8d5" roughness={0.75} />
+      </mesh>
+      {/* Candle wick */}
+      <mesh position={[0, 0.21, 0]}>
+        <cylinderGeometry args={[0.002, 0.002, 0.012, 6]} />
+        <meshBasicMaterial color="#1a1208" />
+      </mesh>
+      {/* Candle flame */}
+      <mesh ref={flameRef} position={[0, 0.225, 0]}>
+        <sphereGeometry args={[0.014, 8, 8]} />
+        <meshBasicMaterial color="#ff9e3b" />
+      </mesh>
+      {/* Flame point light with gentle flicker */}
+      <pointLight
+        ref={lightRef}
+        position={[0, 0.24, 0]}
+        color="#ffaa44"
+        intensity={1.7}
+        distance={4.0}
+        decay={2}
+      />
+    </group>
+  );
+}
+

@@ -1,98 +1,109 @@
 'use client';
 
+import { useLayoutEffect, useState } from 'react';
+import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
+import { PortraitCrop } from '@/types';
 
-// ─── Size constants ──────────────────────────────────────────────────────────────────────
-// Face width/height are DERIVED from headRadius (not fixed absolute values) so
-// they always scale correctly with the head, and cover a large majority of
-// the face rather than reading as a small floating card.
-
-/** Face plane width as a multiple of headRadius (≈ covers 80-90% of the head's front). */
-const FACE_WIDTH_FACTOR = 2.25;
-/** Face plane height as a multiple of headRadius (≈ covers 80-90% of the head's front). */
-const FACE_HEIGHT_FACTOR = 2;
-/**
- * How far in front of the head centre the plane sits.
- * Increased to 2.0 to prevent clipping with the larger face plane size (1.75x width, 1.8x height).
- * A flat plane sitting in front of a curved sphere only clears the sphere's
- * surface if its distance from the sphere's center is large enough relative to
- * its own size — because the sphere curves away as you move outward from the
- * center of the face, a larger flat plane's edges are effectively closer to
- * the curved surface at the same central offset distance than a smaller plane's
- * edges were.
- */
+// Portrait plate: taller than wide so a headshot fills it instead of a landscape slice.
+const FACE_WIDTH_FACTOR = 1.7;
+const FACE_HEIGHT_FACTOR = 2.25;
 const FACE_Z_FACTOR = 1.5;
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+const FACE_TEXTURE_MAX = 512;
 
 interface CharacterFaceProps {
-  /**
-   * The radius of the head sphere in local group units.
-   * The plane is placed at headRadius * FACE_Z_FACTOR along the group's +Z axis,
-   * which — after the character's rotation — faces toward the table/camera.
-   */
   headRadius: number;
-  /**
-   * Optional texture to display on the face plane.
-   * Passing a THREE.Texture here is the ONLY change needed to show a real photo.
-   *
-   * To use later:
-   *   import { useTexture } from '@react-three/drei';
-   *   const tex = useTexture('/photos/aria.jpg');
-   *   <CharacterFace headRadius={r} map={tex} />
-   */
-  map?: THREE.Texture;
-  /** Width override (defaults to headRadius * FACE_WIDTH_FACTOR) */
+  portraitSrc: string;
+  portraitCrop: PortraitCrop;
   faceWidth?: number;
-  /** Height override (defaults to headRadius * FACE_HEIGHT_FACTOR) */
   faceHeight?: number;
 }
 
+function sourceSize(img: TexImageSource): { width: number; height: number } | null {
+  if ('width' in img && 'height' in img && img.width && img.height) {
+    return { width: img.width, height: img.height };
+  }
+  return null;
+}
+
+function cropFaceTexture(
+  source: THREE.Texture,
+  crop: PortraitCrop,
+  planeAspect: number,
+): THREE.CanvasTexture | null {
+  const size = sourceSize(source.image);
+  if (!size) return null;
+
+  const { width: imgW, height: imgH } = size;
+  let cropW = THREE.MathUtils.clamp(crop.width, 0.05, 1) * imgW;
+  let cropH = cropW / planeAspect;
+
+  if (cropH > imgH) {
+    cropH = imgH;
+    cropW = cropH * planeAspect;
+  }
+  if (cropW > imgW) {
+    cropW = imgW;
+    cropH = cropW / planeAspect;
+  }
+
+  const sx = THREE.MathUtils.clamp(crop.cx * imgW - cropW / 2, 0, imgW - cropW);
+  const sy = THREE.MathUtils.clamp(crop.cy * imgH - cropH / 2, 0, imgH - cropH);
+
+  const outW = Math.max(1, Math.round(Math.min(FACE_TEXTURE_MAX, cropW)));
+  const outH = Math.max(1, Math.round(outW / planeAspect));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.drawImage(source.image as CanvasImageSource, sx, sy, cropW, cropH, 0, 0, outW, outH);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /**
- * CharacterFace — a flat white placeholder plane positioned in front of the
- * character's head, ready to receive a photo texture with zero refactoring.
- *
- * The plane is a CHILD of the character group, so it inherits the character's
- * rotation automatically — no manual world-space orientation needed.
- *
- * The plane is non-interactive (raycast is disabled) to keep pointer events
- * clean for other scene objects.
- *
- * To add a texture later, pass the `map` prop. Nothing else changes.
+ * CharacterFace — a portrait-aspect plate on the character's head, filled
+ * with a canvas-cropped headshot so the photo maps 1:1 onto the plane.
  */
 export default function CharacterFace({
   headRadius,
-  map,
+  portraitSrc,
+  portraitCrop,
   faceWidth = headRadius * FACE_WIDTH_FACTOR,
   faceHeight = headRadius * FACE_HEIGHT_FACTOR,
 }: CharacterFaceProps) {
+  const source = useTexture(portraitSrc);
+  const [faceMap, setFaceMap] = useState<THREE.CanvasTexture | null>(null);
   const faceZ = headRadius * FACE_Z_FACTOR;
-  // Move the plane down slightly from head center to cover more of the lower face
   const faceY = -headRadius * 0.7;
+  const planeAspect = faceWidth / faceHeight;
+
+  useLayoutEffect(() => {
+    const tex = cropFaceTexture(source, portraitCrop, planeAspect);
+    if (!tex) return;
+    setFaceMap(tex);
+    return () => {
+      tex.dispose();
+    };
+  }, [source, portraitCrop, planeAspect]);
+
+  if (!faceMap) return null;
 
   return (
-    <mesh
-      // Placed at the front face of the head (+Z in character-local space).
-      // x=0 keeps it perfectly centred horizontally; faceY moves it down slightly
-      // to cover more of the lower face area. No independent rotation is set here,
-      // so this mesh inherits the parent group's rotation exactly.
-      position={[0, faceY, faceZ]}
-      // Disable raycasting — plane is purely visual
-      raycast={() => null}
-    >
+    <mesh position={[0, faceY, faceZ]} raycast={() => null}>
       <planeGeometry args={[faceWidth, faceHeight]} />
-      {/*
-       * Dedicated material instance for this mesh only (JSX materials are never
-       * shared across elements) — fully opaque, solid white placeholder card.
-       * transparent/opacity are hardcoded (not conditional) so the plane never
-       * reads as translucent/frosted, regardless of whether `map` is set.
-       */}
-      <meshStandardMaterial
+      <meshBasicMaterial
         color="white"
-        map={map ?? null}
+        map={faceMap}
         side={THREE.FrontSide}
-        roughness={0.6}
-        metalness={0}
+        toneMapped={false}
         transparent={false}
         opacity={1}
       />

@@ -2,7 +2,7 @@
 
 import { Canvas } from '@react-three/fiber';
 import { Stats } from '@react-three/drei';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { CHARACTERS } from '@/lib/characters';
 import { useChatStore } from '@/store/useChatStore';
 import { SEAT_ANGLES_DEG, SEAT_RADIUS, seatPosition } from '@/lib/constants';
@@ -62,24 +62,24 @@ function useSeatLayoutVerification() {
 
 /**
  * Root of the 3D scene.
- *
- * near=0.05 — prevents player hands (close to camera) from being clipped.
- * dpr={[1, 2]} caps the device pixel ratio at 2x — on high-DPI displays an
- * uncapped devicePixelRatio (e.g. 3x on some phones/laptops) multiplies the
- * number of pixels the GPU has to shade and can tank frame rate for no
- * visible benefit beyond 2x.
- * Memoized so chat store message updates don't re-mount the Canvas.
- *
- * Mouse-look performance: CameraRig (see CameraRig.tsx) stores yaw/pitch in
- * refs and mutates camera.quaternion directly inside useFrame — it never
- * touches React state or Zustand on mousemove, so mouse movement causes zero
- * React re-renders. The only Zustand writes from the camera path are on
- * pointerlockchange (lock/unlock), which fires rarely, not per-frame.
  */
 const Scene = memo(function Scene() {
   const speakingEntries = useChatStore((s) => s.speakingEntries);
+  const [showStats, setShowStats] = useState(false);
 
   useSeatLayoutVerification();
+
+  useEffect(() => {
+    if (!isDev) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle stats on backtick (`) or F2
+      if (e.key === '`' || e.key === 'F2') {
+        setShowStats((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <Canvas
@@ -89,9 +89,8 @@ const Scene = memo(function Scene() {
       gl={{ antialias: true, alpha: false }}
       style={{ width: '100%', height: '100%', background: '#0a0a14' }}
     >
-      {/* Dev-only FPS/ms/MB overlay — confirm smooth 60fps+ during mouse-look,
-          then this is automatically excluded from production builds. */}
-      {isDev && <Stats />}
+      {/* Dev-only FPS/ms/MB overlay — gated behind dev mode and toggled via ` or F2 */}
+      {isDev && showStats && <Stats />}
 
       <CameraRig />
       <Lighting />
