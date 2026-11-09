@@ -138,3 +138,5 @@ cached_datasets/
 knowledge_base/
 vector_stores/
 .next/
+
+finetune/

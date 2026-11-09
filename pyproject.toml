@@ -39,6 +39,12 @@ dependencies = [
     "nest-asyncio>=1.6.0",
     "mlflow>=3.16.0",
     "tqdm>=4.70.0",
+    "huggingface-hub[cli]>=1.30.0",
+    "hf>=1.32.0",
+    "laya>=0.3.20",
+    "datasets>=4.3.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
 ]
 
 [project.scripts]
